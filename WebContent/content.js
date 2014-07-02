@@ -93,7 +93,7 @@ function extractData(rawText) {
 	var tokens, text = rawText.trim();
 
 	function test(text) {
-		return ((text.charAt(0) == "[" && text.charAt(text.length - 1) == "]") || (text.charAt(0) == "{" && text.charAt(text.length - 1) == "}"));
+		return text.indexOf("Array\n(") !== -1;
 	}
 
 	if (test(text))
@@ -113,21 +113,19 @@ function extractData(rawText) {
 }
 
 function processData(data) {
+
 	var xhr, jsonText;
 	
 	function formatToHTML(fnName, offset) {
 		if (!jsonText)
 			return;	
+		jsonObject = {};
 		port.postMessage({
 			jsonToHTML : true,
 			json : jsonText,
 			fnName : fnName,
 			offset : offset
 		});
-		try {
-			jsonObject = JSON.parse(jsonText);
-		} catch (e) {
-		}
 	}
 
 	if (window == top || options.injectInFrame)

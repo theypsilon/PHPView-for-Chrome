@@ -1,7 +1,8 @@
 /**
  * Adapted the code in to order to run in a web worker. 
  * 
- * Original author: Benjamin Hollis
+ * Original  author: Benjamin Hollis
+ * parse_PHP author: José Manuel Barroso Galindo
  */
 
 function htmlEncode(t) {
@@ -79,10 +80,71 @@ function jsonToHTML(json, fnName) {
 	return output;
 }
 
+function parse_PHP(input) {
+	"use strict";
+	var arrow = "=> "
+    var trim  = function(string) {
+      return string.replace(/^\s+|\s+$/g, '');
+    }
+    var is_array = function(line) {
+      return trim(line).indexOf("Array") !== -1 || trim(line).indexOf("Object") !== -1;
+    }
+    var is_beg_a = function(line) {
+      return trim(line) == "(";
+    }
+    var is_end_a = function(line) {
+      return trim(line) == ")";
+    }
+    var is_elmnt = function(line) {
+      return line.match(/\[(.+?)\] =>/);
+    }
+    var get_elmnt_key   = function(line) {
+      return line.match(/\[(.+?)\]/)[1];
+    }
+    var get_elmnt_value = function(line) {
+      return line.slice(line.indexOf(arrow) + arrow.length);        
+    }
+
+    var parse_array = function(lines) {
+        var ret = {}
+        while (lines.length > 0) {
+            var line = lines.shift();
+            if (is_elmnt(line)) {
+                var key = get_elmnt_key(line);
+                if (is_array(line) && is_beg_a(lines[0])) {
+                    var val  = {__parent: ret};
+                    ret[key] = val;
+                    ret      = val;
+                } else {
+                    ret[key] = get_elmnt_value(line);
+                }
+
+            } else if (is_end_a(line)) {
+                if (ret.__parent) {
+                    var temp = ret.__parent;
+                    delete     ret.__parent;
+                    ret = temp;
+                } else {
+                    break;
+                }
+            }
+        }
+        return ret;
+    }
+
+    var lines = trim(input).split("\n");
+    var ret   = [];
+    while (lines.length > 0) {
+      var line = lines.shift();
+      ret.push(is_array(line) ? parse_array(lines) : line);
+    }
+    return ret;
+}
+
 addEventListener("message", function(event) {
 	var object;
 	try {
-		object = JSON.parse(event.data.json);
+		object = parse_PHP(event.data.json);
 	} catch (e) {
 		postMessage({
 			error : true

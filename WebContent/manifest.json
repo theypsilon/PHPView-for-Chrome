@@ -1,11 +1,11 @@
 {
-  "name": "JSONView",
+  "name": "PHPView",
   "icons": {
 	"16": "jsonview16.png",
 	"48": "jsonview48.png",
     "128": "jsonview128.png"},
-  "version": "0.0.32.2",
-  "description": "Validate and view JSON documents",
+  "version": "0.1.0",
+  "description": "Validate and view PHP print_r outputs",
   "options_page": "options.html",
   "background" : {
     "scripts": [
