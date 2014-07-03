@@ -25,3 +25,5 @@ We will see this in Chrome:
 
 
 And it also allows you to collapse branches.
+
+Check it out int he Chrome Store: https://chrome.google.com/webstore/detail/phpview/nlkobfbkblfhlcobdomlhmpbbhmcbkfd
