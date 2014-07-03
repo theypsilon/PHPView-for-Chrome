@@ -22,4 +22,6 @@ We will see this in Chrome:
 ```js
     [{"element": "value"}]
 ```
-Allows you to collapse branches.
+
+
+And it also allows you to collapse branches.
