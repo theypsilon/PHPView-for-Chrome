@@ -274,8 +274,9 @@ function init(data) {
 
 function load() {
 	var child, data;
-	var index = document.body.innerHTML.indexOf("Array\n(");
-	if (index !== -1) {
+	if (document.body.innerHTML.indexOf("Array\n(" ) !== -1 ||
+		document.body.innerHTML.indexOf("Object\n(")
+	) {
 		data = extractData(document.body.innerHTML);
 		if (data)
 			init(data);
