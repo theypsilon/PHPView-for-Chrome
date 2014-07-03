@@ -109,7 +109,7 @@ var options = {};
 if (localStorage.options)
 	options = JSON.parse(localStorage.options);
 if (typeof options.addContextMenu == "undefined") {
-	options.addContextMenu = true;
+	options.addContextMenu = false;
 	localStorage.options = JSON.stringify(options);
 }
 

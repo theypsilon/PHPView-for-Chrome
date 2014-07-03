@@ -1,3 +1,7 @@
+0.1.4
+=====
+Context Menu is disabled by default (change it in configurations page if you need it)
+
 0.1.3
 =====
 Bugfixing a problem which makes this work with any page
