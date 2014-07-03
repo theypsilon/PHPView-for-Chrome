@@ -93,7 +93,7 @@ function extractData(rawText) {
 	var tokens, text = rawText.trim();
 
 	function test(text) {
-		return text.indexOf("Array\n(") !== -1;
+		return true;
 	}
 
 	if (test(text))
@@ -274,9 +274,9 @@ function init(data) {
 
 function load() {
 	var child, data;
-	if (document.body && (document.body.childNodes[0] && document.body.childNodes[0].tagName == "PRE" || document.body.children.length == 0)) {
-		child = document.body.children.length ? document.body.childNodes[0] : document.body;
-		data = extractData(child.innerText);
+	var index = document.body.innerHTML.indexOf("Array\n(");
+	if (index !== -1) {
+		data = extractData(document.body.innerHTML);
 		if (data)
 			init(data);
 	}

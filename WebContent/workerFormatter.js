@@ -82,7 +82,8 @@ function jsonToHTML(json, fnName) {
 
 function parse_PHP(input) {
 	"use strict";
-	var arrow = "=> "
+	var arrow1 = "=> ",
+		arrow2 = "=&gt; ";
     var trim  = function(string) {
       return string.replace(/^\s+|\s+$/g, '');
     }
@@ -95,14 +96,26 @@ function parse_PHP(input) {
     var is_end_a = function(line) {
       return trim(line) == ")";
     }
-    var is_elmnt = function(line) {
+    var is_elmnt1 = function(line) {
       return line.match(/\[(.+?)\] =>/);
+    }
+    var is_elmnt2 = function(line) {
+      return line.match(/\[(.+?)\] =&gt;/);
+    }
+    var is_elmnt = function(line) {
+      return is_elmnt1(line) || is_elmnt2(line);
     }
     var get_elmnt_key   = function(line) {
       return line.match(/\[(.+?)\]/)[1];
     }
-    var get_elmnt_value = function(line) {
-      return line.slice(line.indexOf(arrow) + arrow.length);        
+    var get_elmnt_value1 = function(line) {
+      return line.slice(line.indexOf(arrow1) + arrow1.length);        
+    }
+    var get_elmnt_value2 = function(line) {
+      return line.slice(line.indexOf(arrow2) + arrow2.length);        
+    }
+    var get_elmnt_value  = function(line) {
+      return is_elmnt1(line) ? get_elmnt_value1(line) : get_elmnt_value2(line);
     }
 
     var parse_array = function(lines) {
