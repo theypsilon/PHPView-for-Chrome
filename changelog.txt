@@ -1,6 +1,7 @@
 0.1.4
 =====
 Context Menu is disabled by default (change it in configurations page if you need it)
+Fixing false positives in recognition of webpages like this one: http://www.php.net/manual/es/function.array-filter.php
 
 0.1.3
 =====

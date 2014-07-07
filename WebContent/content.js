@@ -93,14 +93,19 @@ function extractData(rawText) {
 	var tokens, text = rawText.trim();
 
 	function test(text) {
-		return true;
+		var pre = text.indexOf("<pre>");
+	    var arr = text.indexOf("Array\n(" );
+		var obj = text.indexOf("Object\n(");
+		return arr === 0 || obj === 0 || (pre < 50 && (arr !== -1 || obj !== -1));
 	}
 
-	if (test(text))
+	if (test(text)) {
+		var offset = text.indexOf("<pre>");
 		return {
 			text : rawText,
-			offset : 0
+			offset : offset !== -1 ? offset : 0
 		};
+	}
 	tokens = text.match(/^([^\s\(]*)\s*\(([\s\S]*)\)\s*;?$/);
 	if (tokens && tokens[1] && tokens[2]) {
 		if (test(tokens[2].trim()))
@@ -278,6 +283,7 @@ function load() {
 		document.body.innerHTML.indexOf("Object\n(") !== -1
 	) {
 		data = extractData(document.body.innerHTML);
+		console.log(data);
 		if (data)
 			init(data);
 	}
