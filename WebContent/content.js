@@ -96,7 +96,7 @@ function extractData(rawText) {
 		var pre = text.indexOf("<pre>");
 	    var arr = text.indexOf("Array\n(" );
 		var obj = text.indexOf("Object\n(");
-		return arr === 0 || obj === 0 || (pre < 50 && (arr !== -1 || obj !== -1));
+		return arr === 0 || obj === 0 || (pre < 10 && (arr !== -1 || obj !== -1));
 	}
 
 	if (test(text)) {

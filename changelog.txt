@@ -1,3 +1,7 @@
+0.1.5
+=====
+More restrictive when it comes to false positives.
+
 0.1.4
 =====
 Context Menu is disabled by default (change it in configurations page if you need it)
