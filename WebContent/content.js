@@ -1,9 +1,19 @@
-var port = chrome.runtime.connect(), collapsers, options, jsonObject;
+var port = chrome.runtime.connect(), collapsers, options, jsonSelector;
+let content
 
 function displayError(error, loc, offset) {
-	var link = document.createElement("link"), pre = document.body.firstChild.firstChild, text = pre.textContent.substring(offset), start = 0, ranges = [], idx = 0, end, range = document
-			.createRange(), imgError = document.createElement("img"), content = document.createElement("div"), errorPosition = document.createElement("span"), container = document
-			.createElement("div"), closeButton = document.createElement("div");
+	const link = document.createElement("link");
+	const pre = document.body.firstChild.firstChild;
+	const text = pre.textContent.substring(offset);
+	const start = 0;
+	const ranges = [];
+	const idx = 0;
+	let end, range = document.createRange();
+	const imgError = document.createElement("img");
+	content = document.createElement("div");
+	const errorPosition = document.createElement("span");
+	const container = document.createElement("div");
+	const closeButton = document.createElement("div");;
 	link.rel = "stylesheet";
 	link.type = "text/css";
 	link.href = chrome.runtime.getURL("content_error.css");
@@ -39,12 +49,21 @@ function displayError(error, loc, offset) {
 	history.replaceState({}, "", "#");
 }
 
-function displayUI(theme, html) {
-	var statusElement, toolboxElement, expandElement, reduceElement, viewSourceElement, optionsElement, content = "";
+function displayUI(theme, html, jsonObject) {
+	var statusElement, toolboxElement, expandElement, reduceElement, viewSourceElement, optionsElement, userStyleElement, baseStyleElement;
 	content += '<link rel="stylesheet" type="text/css" href="' + chrome.runtime.getURL("jsonview-core.css") + '">';
+	baseStyleElement = document.createElement("link");
 	content += "<style>" + theme + "</style>";
+	baseStyleElement.rel = "stylesheet";
 	content += html;
+	baseStyleElement.type = "text/css";
 	document.body.innerHTML = content;
+	baseStyleElement.href = chrome.runtime.getURL("jsonview-core.css");
+	document.head.appendChild(baseStyleElement);
+	userStyleElement = document.createElement("style");
+	userStyleElement.appendChild(document.createTextNode(theme));
+	document.head.appendChild(userStyleElement);
+	document.body.innerHTML = html;
 	collapsers = document.querySelectorAll("#json .collapsible .collapsible");
 	statusElement = document.createElement("div");
 	statusElement.className = "status";
@@ -75,13 +94,16 @@ function displayUI(theme, html) {
 	document.body.addEventListener('click', ontoggle, false);
 	document.body.addEventListener('mouseover', onmouseMove, false);
 	document.body.addEventListener('click', onmouseClick, false);
-	document.body.addEventListener('contextmenu', onContextMenu, false);
+	document.body.addEventListener('contextmenu', (event) => onContextMenu(event, jsonObject), false);
 	expandElement.addEventListener('click', onexpand, false);
 	reduceElement.addEventListener('click', onreduce, false);
 	optionsElement.addEventListener("click", function() {
 		window.open(chrome.runtime.getURL("options.html"));
 	}, false);
-	copyPathElement.addEventListener("click", function() {
+	copyPathElement.addEventListener("click", function(event) {
+		if (event.isTrusted === false)
+			return;
+
 		port.postMessage({
 			copyPropertyPath : true,
 			path : statusElement.innerText
@@ -123,8 +145,8 @@ function processData(data) {
 	
 	function formatToHTML(fnName, offset) {
 		if (!jsonText)
-			return;	
-		jsonObject = {};
+			return;
+
 		port.postMessage({
 			jsonToHTML : true,
 			json : jsonText,
@@ -135,18 +157,18 @@ function processData(data) {
 
 	if (window == top || options.injectInFrame)
 		if (options.safeMethod) {
-			xhr = new XMLHttpRequest();
-			xhr.onreadystatechange = function() {
-				if (this.readyState == 4) {
-					data = extractData(this.responseText);
+			fetch(document.location.href)
+				.then(response => response.text())
+				.then(responseText => {
+					const data = extractData(responseText);
 					if (data) {
 						jsonText = data.text;
 						formatToHTML(data.fnName, data.offset);
 					}
-				}
-			};
-			xhr.open("GET", document.location.href, true);
-			xhr.send(null);
+				})
+				.catch(fetchError => {
+					console.error('Unsafe request not working well on PHPView, please disable it.', fetchError)
+				});
 		} else if (data) {
 			jsonText = data.text;
 			formatToHTML(data.fnName, data.offset);
@@ -195,13 +217,17 @@ var onmouseMove = (function() {
 			hoveredLI.firstChild.classList.remove("hovered");
 			hoveredLI = null;
 			statusElement.innerText = "";
+			jsonSelector = [];
 		}
 	}
 
 	return function(event) {
+		if (event.isTrusted === false)
+			return;
 		var str = "", statusElement = document.querySelector(".status");
 		element = getParentLI(event.target);
 		if (element) {
+			jsonSelector = [];
 			if (hoveredLI)
 				hoveredLI.firstChild.classList.remove("hovered");
 			hoveredLI = element;
@@ -210,9 +236,12 @@ var onmouseMove = (function() {
 				if (element.parentNode.classList.contains("array")) {
 					var index = [].indexOf.call(element.parentNode.children, element);
 					str = "[" + index + "]" + str;
+					jsonSelector.unshift(index);
 				}
 				if (element.parentNode.classList.contains("obj")) {
-					str = "." + element.firstChild.firstChild.innerText + str;
+					var key = element.firstChild.firstChild.innerText;
+					str = "." + key + str;
+					jsonSelector.unshift(key);
 				}
 				element = element.parentNode.parentNode.parentNode;
 			} while (element.tagName == "LI");
@@ -236,15 +265,17 @@ function onmouseClick() {
 	}
 }
 
-function onContextMenu() {
+function onContextMenu(event, jsonObject) {
 	var currentLI, statusElement, selection = "", i, value;
 	currentLI = getParentLI(event.target);
 	statusElement = document.querySelector(".status");
 	if (currentLI) {
-		if (Array.isArray(jsonObject))
-			value = eval("(jsonObject" + statusElement.innerText + ")");
-		else
-			value = eval("(jsonObject." + statusElement.innerText + ")");
+
+		var value = jsonObject;
+		jsonSelector.forEach(function(idx) {
+			value = value[idx];
+		});
+
 		port.postMessage({
 			copyPropertyPath : true,
 			path : statusElement.innerText,
@@ -261,12 +292,12 @@ function init(data) {
 		}
 		if (msg.onjsonToHTML)
 			if (msg.html) {
-				displayUI(msg.theme, msg.html);
+				displayUI(msg.theme, msg.html, msg.jsonObject);
 			} else if (msg.json)
 				port.postMessage({
 					getError : true,
-					json : json,
-					fnName : fnName
+					json : msg.json,
+					fnName : data.fnName
 				});
 		if (msg.ongetError) {
 			displayError(msg.error, msg.loc, msg.offset);
@@ -283,10 +314,51 @@ function load() {
 		document.body.innerHTML.indexOf("Object\n(") !== -1
 	) {
 		data = extractData(document.body.innerHTML);
-		console.log(data);
-		if (data)
+		if (data) {
 			init(data);
+		}
 	}
 }
 
 load();
+
+function startWorker(message, sendResponse, filename) {
+	fetch(chrome.runtime.getURL(filename))
+		.then(fetchResponse => fetchResponse.text())
+		.then(function (scriptText) {
+			const blob = new Blob([scriptText], { type: 'application/javascript' });
+			return URL.createObjectURL(blob);
+		})
+		.then(workerUrl => {
+			const worker = new Worker(workerUrl);
+
+			worker.addEventListener('message', (event) => {
+				sendResponse({ workerMessage: event.data });
+				worker.terminate();
+			});
+
+			worker.postMessage({
+				json: message.json,
+			});
+		})
+		.catch(fetchError => {
+			console.error('Error fetching worker script on PHPView:', fetchError)
+		});
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'workerFormatterMessage') {
+		startWorker(message, sendResponse, 'workerFormatter.js')
+    } else if (message.action === 'workerJSONLintMessage') {
+		startWorker(message, sendResponse, 'workerJSONLint.js')
+    }
+	return true;
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+	if (message.writeToClipboard) {
+		navigator.clipboard.writeText(message.writeToClipboard)
+			.then(() => sendResponse())
+			.catch(_e => {});
+	}
+});

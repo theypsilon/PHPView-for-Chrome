@@ -1,122 +1,158 @@
 var path, value, copyPathMenuEntryId, copyValueMenuEntryId;
 
 function getDefaultTheme(callback) {
-	var xhr = new XMLHttpRequest();
-	xhr.onreadystatechange = function() {
-		if (xhr.readyState == 4)
-			callback(xhr.responseText);
-	};
-	xhr.open("GET", "jsonview.css", true);
-	xhr.send(null);
+	fetch(chrome.runtime.getURL('jsonview.css'))
+		.then(response => response.text())
+		.then(function(responseText) {
+			callback(responseText);
+		})
+		.catch(function(e) {
+			console.error('PHPViewExtensions error fetching the custom theme.', e);
+			callback("");
+		})
 }
 
-function copy(value) {
-	var selElement, selRange, selection;
-	selElement = document.createElement("span");
-	selRange = document.createRange();
-	selElement.innerText = value;
-	document.body.appendChild(selElement);
-	selRange.selectNodeContents(selElement);
-	selection = window.getSelection();
-	selection.removeAllRanges();
-	selection.addRange(selRange);
-	document.execCommand("Copy");
-	document.body.removeChild(selElement);
+function storeGet(key, cb) {
+	return chrome.storage.local.get(key, cb);
 }
 
-function refreshMenuEntry() {
-	var options = localStorage.options ? JSON.parse(localStorage.options) : {};
-	if (options.addContextMenu && !copyPathMenuEntryId) {
-		copyPathMenuEntryId = chrome.contextMenus.create({
-			title : "Copy path",
-			contexts : [ "page", "link" ],
-			onclick : function(info, tab) {
-				copy(path);				
-			}
-		});
-		copyValueMenuEntryId = chrome.contextMenus.create({
-			title : "Copy value",
-			contexts : [ "page", "link" ],
-			onclick : function(info, tab) {
-				copy(value);				
-			}
+function storeSet(kv, cb) {
+	return chrome.storage.local.set(kv, cb);
+}
+
+function setCopy(tab, value) {
+	chrome.tabs.sendMessage(tab.id, {
+		writeToClipboard: value
+	}, function(_response) {});
+}
+
+function refreshMenuEntry(port) {
+	storeGet(['options'], function(data) {
+		const options = data.options ? data.options : {};
+		if (options.addContextMenu && !copyPathMenuEntryId) {
+			copyPathMenuEntryId = chrome.contextMenus.create({
+				title : "Copy path",
+				id : "copy-path",
+				contexts : [ "page", "link", "selection" ],
+			});
+			copyValueMenuEntryId = chrome.contextMenus.create({
+				title : "Copy value",
+				id : "copy-value",
+				contexts : [ "page", "link", "selection" ],
+			});
+			chrome.contextMenus.onClicked.addListener((info, tab) => {
+				if (!info.menuItemId) {
+					return;
+				}
+				switch (info.menuItemId) {
+					case 'copy-path': setCopy(tab, path); break;
+					case 'copy-value': setCopy(tab, value); break;
+				}
+			})
+		}
+		if (!options.addContextMenu && copyPathMenuEntryId) {
+			chrome.contextMenus.remove(copyPathMenuEntryId);
+			chrome.contextMenus.remove(copyValueMenuEntryId);
+			copyPathMenuEntryId = null;
+		}
+	});
+}
+
+function onWorkerJSONLintMessage(port, response) {
+	if (response?.workerMessage?.error) {
+		port.postMessage({
+			ongetError : true,
+			error : response.workerMessage.error,
+			loc : response.workerMessage.loc,
+			offset : msg.offset
 		});
 	}
-	if (!options.addContextMenu && copyPathMenuEntryId) {
-		chrome.contextMenus.remove(copyPathMenuEntryId);
-		chrome.contextMenus.remove(copyValueMenuEntryId);
-		copyPathMenuEntryId = null;
+}
+
+function onWorkerFormatterMessage(port, response) {
+	const message = response.workerMessage;
+	if (message.html) {
+		storeGet(['theme'], function(data) {
+			port.postMessage({
+				onjsonToHTML : true,
+				html : message.html,
+				theme : data.theme,
+				jsonObject : message.jsonObject
+			});
+		})
+	}
+	if (message.error) {
+		chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+			if (!tabs[0]) { 
+				return;
+			}
+			chrome.tabs.sendMessage(tabs[0].id, {
+				action: 'workerJSONLintMessage',
+				json: msg.json,
+			}, function (response) {
+				onWorkerJSONLintMessage(port, response)
+			});
+		});
 	}
 }
 
 function init() {
 	chrome.runtime.onConnect.addListener(function(port) {
 		port.onMessage.addListener(function(msg) {
-			var workerFormatter, workerJSONLint, json = msg.json;
-
-			function onWorkerJSONLintMessage() {
-				var message = JSON.parse(event.data);
-				workerJSONLint.removeEventListener("message", onWorkerJSONLintMessage, false);
-				workerJSONLint.terminate();
-				port.postMessage({
-					ongetError : true,
-					error : message.error,
-					loc : message.loc,
-					offset : msg.offset
-				});
-			}
-
-			function onWorkerFormatterMessage(event) {
-				var message = event.data;
-				workerFormatter.removeEventListener("message", onWorkerFormatterMessage, false);
-				workerFormatter.terminate();
-				if (message.html)
+			if (msg.init) {
+				storeGet(['options'], function(data) {
 					port.postMessage({
-						onjsonToHTML : true,
-						html : message.html,
-						theme : localStorage.theme
+						oninit : true,
+						options : data.options ? data.options : {}
 					});
-				if (message.error) {
-					workerJSONLint = new Worker("workerJSONLint.js");
-					workerJSONLint.addEventListener("message", onWorkerJSONLintMessage, false);
-					workerJSONLint.postMessage(json);
-				}
-			}
-
-			if (msg.init)
-				port.postMessage({
-					oninit : true,
-					options : localStorage.options ? JSON.parse(localStorage.options) : {}
 				});
+			}
 			if (msg.copyPropertyPath) {
 				path = msg.path;
 				value = msg.value;
 			}
 			if (msg.jsonToHTML) {
-				workerFormatter = new Worker("workerFormatter.js");
-				workerFormatter.addEventListener("message", onWorkerFormatterMessage, false);
-				workerFormatter.postMessage({
-					json : json,
-					fnName : msg.fnName
+				chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+					if (!tabs[0]) { 
+						return;
+					}
+					chrome.tabs.sendMessage(tabs[0].id, {
+						action: 'workerFormatterMessage',
+						json: msg.json,
+					}, function (response) {
+						onWorkerFormatterMessage(port, response)
+					});
 				});
 			}
 		});
+		refreshMenuEntry(port);
+		chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+			if (message.phpViewRefreshMenuEntry) {
+				refreshMenuEntry(port)
+			}
+			sendResponse(true);
+		});
 	});
-	refreshMenuEntry();
 }
 
-var options = {};
-if (localStorage.options)
-	options = JSON.parse(localStorage.options);
-if (typeof options.addContextMenu == "undefined") {
-	options.addContextMenu = false;
-	localStorage.options = JSON.stringify(options);
-}
-
-if (!localStorage.theme)
-	getDefaultTheme(function(theme) {
-		localStorage.theme = theme;
+storeGet(['options', 'theme'], function(data) {
+	const options = data.options ? data.options : {};
+	let setOptions = false;
+	if (typeof options.addContextMenu == "undefined") {
+		options.addContextMenu = false;
+		setOptions = true;
+	}
+	if (typeof data.theme !== 'string') {
+		getDefaultTheme(function (defaultTheme) {
+		  storeSet({ options, theme: defaultTheme }, function () {
+			init();
+		  });
+		});
+	} else if (setOptions) {
+		storeSet({ options }, function () {
+			init();
+		});
+	} else {
 		init();
-	});
-else
-	init();
+	}
+})

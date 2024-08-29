@@ -1,4 +1,4 @@
-PHPView 0.1.5
+PHPView 0.2.0
 =============
 
 Chrome extension for pretty printing php print_r outputs.

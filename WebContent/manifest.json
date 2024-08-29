@@ -4,13 +4,11 @@
 	"16": "jsonview16.png",
 	"48": "jsonview48.png",
     "128": "jsonview128.png"},
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Validate and view PHP print_r outputs",
   "options_page": "options.html",
   "background" : {
-    "scripts": [
-      "background.js"
-    ]
+    "service_worker": "background.js"
   },
   "content_scripts": [{
 	  "matches": ["http://*/*", "https://*/*", "ftp://*/*", "file:///*"],
@@ -18,14 +16,21 @@
 	  "run_at" : "document_end",
 	  "all_frames" : true
   }],
-  "web_accessible_resources": [
-    "jsonview.css",
-    "jsonview-core.css",
-    "content_error.css",
-    "options.png",
-    "close_icon.gif",
-    "error.gif"
-  ],
-  "permissions" : ["clipboardWrite", "http://*/", "contextMenus", "https://*/", "ftp://*/"],
-  "manifest_version": 2
+  "web_accessible_resources": [{
+    "resources": [
+      "jsonview.css",
+      "jsonview-core.css",
+      "content_error.css",
+      "options.png",
+      "close_icon.gif",
+      "error.gif"
+    ],
+    "matches": ["<all_urls>"]
+  },{
+    "resources": ["workerFormatter.js", "workerJSONLint.js"],
+    "matches": ["http://*/*", "https://*/*", "file:///*", "ftp://*/*", "chrome-extension://*/*"]
+  }],
+  "permissions" : ["clipboardWrite", "contextMenus", "storage"],
+  "host_permissions" : ["http://*/", "https://*/", "ftp://*/"],
+  "manifest_version": 3
 }
